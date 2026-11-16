@@ -1,39 +1,47 @@
-
 # Search Engine Keyword Frequency Analysis
 
 ## Project Description
-This project analyses search queries to identify frequently used keywords. It displays keyword frequencies in a table and a bar chart.
+Search Engine Keyword Frequency Analysis is a Python-based project that analyzes search queries and identifies the most frequently used keywords. It helps users understand common search terms through tables and visualizations.
+
+## Objectives
+- Analyze search query data from CSV files.
+- Identify frequently occurring keywords.
+- Calculate keyword frequency and percentage.
+- Display results using tables and bar charts.
+- Allow users to download analysis results.
 
 ## Technologies Used
 - Python
-- Pandas
 - Streamlit
+- Pandas
 - Matplotlib
-- CSV Dataset
+- Regular Expressions
 
 ## Features
-- Upload CSV files
-- Select a search-query column
-- Count keyword frequencies
-- Display keyword frequency tables
-- Visualise the top 10 keywords
-- Download analysis results as a CSV file
+- CSV file upload
+- Keyword frequency counting
+- Keyword ranking
+- Percentage calculation
+- Interactive keyword search
+- Bar chart visualization
+- CSV result download
 
 ## How It Works
 1. Upload a CSV file containing search queries.
 2. Select the column containing the queries.
-3. The application processes the text and counts keywords.
-4. View the frequency table and chart.
-5. Download the results.
+3. The application processes the text and removes common words.
+4. It calculates keyword frequencies and percentages.
+5. Results are displayed in a table and chart.
+6. Users can download the results.
 
-## How to Run Locally
-Install the required libraries:
+## How to Run
+Install the required packages:
 
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 Run the application:
 
-streamlit run app.py
+`streamlit run app.py`
 
-## Dataset
-The project uses sample search queries for demonstration. These are not actual search-engine traffic data.
+## Note
+The application analyzes the dataset provided by the user. It does not collect live search engine data automatically.
