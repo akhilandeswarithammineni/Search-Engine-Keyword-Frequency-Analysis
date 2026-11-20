@@ -6,6 +6,8 @@ import re
 
 from collections import Counter
 from wordcloud import WordCloud
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 
 
 # PAGE CONFIGURATION
@@ -15,14 +17,8 @@ st.set_page_config(
     layout="wide"
 )
 
-
-# TITLE
 st.title("🔍 Search Engine Keyword Frequency Analysis")
-st.write(
-    "Analyze search queries, discover popular keywords "
-    "and understand user search behavior."
-)
-
+st.write("Analyze keywords, discover search patterns and predict user search intent.")
 st.divider()
 
 
@@ -38,50 +34,103 @@ STOP_WORDS = {
 }
 
 
-# SEARCH INTENT CLASSIFICATION
-def classify_intent(query):
+# MACHINE LEARNING TRAINING DATA
+training_data = [
+    # INFORMATIONAL
+    ("what is python", "Informational"),
+    ("how to learn programming", "Informational"),
+    ("python programming tutorial", "Informational"),
+    ("explain machine learning", "Informational"),
+    ("what is artificial intelligence", "Informational"),
+    ("learn data science", "Informational"),
+    ("python beginner guide", "Informational"),
+    ("how does deep learning work", "Informational"),
+    ("meaning of data analytics", "Informational"),
+    ("examples of python programming", "Informational"),
+    ("how to use pandas", "Informational"),
+    ("machine learning algorithms explained", "Informational"),
+    ("learn web development", "Informational"),
+    ("what is neural network", "Informational"),
+    ("python coding lessons", "Informational"),
 
-    q = query.lower()
+    # NAVIGATIONAL
+    ("python official website", "Navigational"),
+    ("google homepage", "Navigational"),
+    ("github login", "Navigational"),
+    ("python documentation website", "Navigational"),
+    ("facebook login page", "Navigational"),
+    ("youtube official website", "Navigational"),
+    ("openai homepage", "Navigational"),
+    ("microsoft official website", "Navigational"),
+    ("stackoverflow website", "Navigational"),
+    ("google account login", "Navigational"),
+    ("github official page", "Navigational"),
+    ("python website", "Navigational"),
+    ("linkedin login", "Navigational"),
+    ("amazon customer support", "Navigational"),
+    ("google contact page", "Navigational"),
 
-    transactional = [
-        "buy", "purchase", "order", "download",
-        "subscribe", "sign up", "register",
-        "book", "price", "coupon", "discount"
-    ]
+    # TRANSACTIONAL
+    ("buy python programming course", "Transactional"),
+    ("download python software", "Transactional"),
+    ("purchase online course", "Transactional"),
+    ("register for coding classes", "Transactional"),
+    ("subscribe to learning platform", "Transactional"),
+    ("order programming books", "Transactional"),
+    ("book python training", "Transactional"),
+    ("sign up for python course", "Transactional"),
+    ("buy machine learning course", "Transactional"),
+    ("download data science software", "Transactional"),
+    ("purchase online tutorials", "Transactional"),
+    ("get discount on coding course", "Transactional"),
+    ("buy programming books online", "Transactional"),
+    ("register for web development course", "Transactional"),
+    ("download coding application", "Transactional"),
 
-    navigational = [
-        "official website", "login", "log in",
-        "homepage", "website", "contact",
-        "customer support"
-    ]
+    # COMMERCIAL
+    ("best python courses", "Commercial"),
+    ("top programming languages", "Commercial"),
+    ("python vs java comparison", "Commercial"),
+    ("best machine learning tools", "Commercial"),
+    ("reviews of coding courses", "Commercial"),
+    ("compare python courses", "Commercial"),
+    ("best laptops for programming", "Commercial"),
+    ("top data science platforms", "Commercial"),
+    ("python course ratings", "Commercial"),
+    ("best online learning platforms", "Commercial"),
+    ("cheap programming courses", "Commercial"),
+    ("best web development tools", "Commercial"),
+    ("alternatives to python", "Commercial"),
+    ("machine learning software comparison", "Commercial"),
+    ("best coding bootcamps", "Commercial")
+]
 
-    commercial = [
-        "best", "top", "review", "reviews",
-        "comparison", "compare", "vs",
-        "alternative", "alternatives",
-        "rating", "cheap"
-    ]
+train_queries = [item[0] for item in training_data]
+train_labels = [item[1] for item in training_data]
 
-    informational = [
-        "what", "why", "how", "when", "where",
-        "who", "meaning", "definition", "tutorial",
-        "guide", "learn", "examples", "explain"
-    ]
 
-    if any(word in q for word in transactional):
-        return "Transactional"
+# TRAIN MACHINE LEARNING MODEL
+@st.cache_resource
+def train_model():
 
-    elif any(word in q for word in navigational):
-        return "Navigational"
+    vectorizer = TfidfVectorizer(
+        lowercase=True,
+        ngram_range=(1, 2)
+    )
 
-    elif any(word in q for word in commercial):
-        return "Commercial"
+    X = vectorizer.fit_transform(train_queries)
 
-    elif any(word in q for word in informational):
-        return "Informational"
+    model = LogisticRegression(
+        max_iter=1000,
+        random_state=42
+    )
 
-    else:
-        return "Unclassified"
+    model.fit(X, train_labels)
+
+    return vectorizer, model
+
+
+vectorizer, model = train_model()
 
 
 # CSV UPLOAD
@@ -98,19 +147,13 @@ if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
 
         if df.empty:
-            st.warning("Your CSV file is empty.")
+            st.warning("CSV file is empty.")
 
         else:
 
-            # DATASET PREVIEW
             st.subheader("Dataset Preview")
+            st.dataframe(df.head(10), use_container_width=True)
 
-            st.dataframe(
-                df.head(10),
-                use_container_width=True
-            )
-
-            # COLUMN SELECTION
             text_column = st.selectbox(
                 "Select search query column",
                 df.columns
@@ -119,13 +162,13 @@ if uploaded_file is not None:
             queries = df[text_column].dropna().astype(str)
 
             if queries.empty:
-                st.warning("No valid search queries found.")
+                st.warning("No valid queries found.")
 
             else:
 
                 # KEYWORD FREQUENCY
                 frequencies = Counter()
-                all_phrases = Counter()
+                phrases = Counter()
 
                 for query in queries:
 
@@ -141,22 +184,14 @@ if uploaded_file is not None:
 
                     frequencies.update(clean_words)
 
-                    phrases = [
+                    phrases.update([
                         f"{clean_words[i]} {clean_words[i+1]}"
                         for i in range(len(clean_words) - 1)
-                    ]
+                    ])
 
-                    all_phrases.update(phrases)
-
-                # SEARCH INTENT RESULTS
-                df["Search Intent"] = df[text_column].apply(
-                    lambda x: classify_intent(str(x))
-                    if pd.notna(x) else "Unclassified"
-                )
-
-                # SUMMARY
                 total_words = sum(frequencies.values())
 
+                # SUMMARY
                 st.subheader("Analysis Summary")
 
                 c1, c2, c3 = st.columns(3)
@@ -170,16 +205,6 @@ if uploaded_file is not None:
                 # KEYWORD TABLE
                 st.subheader("Keyword Frequency Results")
 
-                search_keyword = st.text_input(
-                    "Search for a keyword"
-                )
-
-                top_n = st.selectbox(
-                    "Select top keywords",
-                    [5, 10, 15, 20],
-                    index=1
-                )
-
                 results = pd.DataFrame(
                     frequencies.most_common(),
                     columns=["Keyword", "Frequency"]
@@ -189,25 +214,29 @@ if uploaded_file is not None:
                     0, "Rank", range(1, len(results) + 1)
                 )
 
-                if total_words > 0:
+                if total_words:
                     results["Percentage"] = (
-                        results["Frequency"] /
-                        total_words * 100
+                        results["Frequency"] / total_words * 100
                     ).round(2)
 
-                filtered_results = results[
+                search_keyword = st.text_input("Search a keyword")
+
+                filtered = results[
                     results["Keyword"].str.contains(
                         search_keyword,
                         case=False,
-                        na=False,
                         regex=False
                     )
                 ]
 
-                display_results = filtered_results.head(top_n)
+                top_n = st.selectbox(
+                    "Number of top keywords",
+                    [5, 10, 15, 20],
+                    index=1
+                )
 
                 st.dataframe(
-                    display_results,
+                    filtered.head(top_n),
                     use_container_width=True,
                     hide_index=True
                 )
@@ -215,11 +244,11 @@ if uploaded_file is not None:
                 # BAR CHART
                 st.subheader("📊 Keyword Frequency Chart")
 
-                if not display_results.empty:
+                chart_data = filtered.head(top_n).sort_values(
+                    "Frequency"
+                )
 
-                    chart_data = display_results.sort_values(
-                        "Frequency"
-                    )
+                if not chart_data.empty:
 
                     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -240,19 +269,14 @@ if uploaded_file is not None:
 
                 top_keywords = frequencies.most_common(5)
 
-                pie_labels = [
-                    word for word, count in top_keywords
-                ]
+                pie_labels = [x[0] for x in top_keywords]
+                pie_values = [x[1] for x in top_keywords]
 
-                pie_values = [
-                    count for word, count in top_keywords
-                ]
+                other = total_words - sum(pie_values)
 
-                other_count = total_words - sum(pie_values)
-
-                if other_count > 0:
+                if other > 0:
                     pie_labels.append("Others")
-                    pie_values.append(other_count)
+                    pie_values.append(other)
 
                 fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -263,7 +287,7 @@ if uploaded_file is not None:
                     startangle=90
                 )
 
-                ax.set_title("Top 5 Keyword Distribution")
+                ax.set_title("Top Keyword Distribution")
                 ax.axis("equal")
 
                 st.pyplot(fig)
@@ -274,21 +298,15 @@ if uploaded_file is not None:
 
                 if frequencies:
 
-                    wordcloud = WordCloud(
+                    wc = WordCloud(
                         width=1200,
                         height=500,
                         background_color="white",
-                        colormap="viridis",
-                        max_words=100
+                        colormap="viridis"
                     ).generate_from_frequencies(frequencies)
 
                     fig, ax = plt.subplots(figsize=(14, 6))
-
-                    ax.imshow(
-                        wordcloud,
-                        interpolation="bilinear"
-                    )
-
+                    ax.imshow(wc, interpolation="bilinear")
                     ax.axis("off")
 
                     st.pyplot(fig)
@@ -297,54 +315,87 @@ if uploaded_file is not None:
                 # POPULAR PHRASES
                 st.subheader("🔎 Popular Search Phrases")
 
-                if all_phrases:
+                if phrases:
 
-                    phrase_results = pd.DataFrame(
-                        all_phrases.most_common(10),
-                        columns=["Search Phrase", "Frequency"]
+                    phrase_df = pd.DataFrame(
+                        phrases.most_common(10),
+                        columns=["Phrase", "Frequency"]
                     )
 
                     st.dataframe(
-                        phrase_results,
+                        phrase_df,
                         use_container_width=True,
                         hide_index=True
                     )
 
-                # SEARCH INTENT ANALYSIS
+                # MACHINE LEARNING PREDICTION
                 st.divider()
-
-                st.header("🎯 Search Intent Analysis")
+                st.header("🤖 Machine Learning Search Intent Prediction")
 
                 st.write(
-                    "Understand the purpose behind users' "
-                    "search queries."
+                    "The TF-IDF and Logistic Regression model "
+                    "predicts the intent behind each search query."
                 )
 
-                intent_counts = df["Search Intent"].value_counts()
-
-                a, b, c, d = st.columns(4)
-
-                a.metric(
-                    "Informational",
-                    int(intent_counts.get("Informational", 0))
+                new_query = st.text_input(
+                    "Enter a search query to predict its intent",
+                    placeholder="Example: best Python courses"
                 )
 
-                b.metric(
-                    "Navigational",
-                    int(intent_counts.get("Navigational", 0))
+                if new_query.strip():
+
+                    vector = vectorizer.transform([new_query])
+
+                    prediction = model.predict(vector)[0]
+
+                    probabilities = model.predict_proba(vector)[0]
+
+                    confidence = max(probabilities) * 100
+
+                    st.success(
+                        f"Predicted Intent: {prediction}"
+                    )
+
+                    st.metric(
+                        "Model Confidence",
+                        f"{confidence:.2f}%"
+                    )
+
+                    st.caption(
+                        "Confidence is the model's estimated "
+                        "probability, not a guarantee of correctness."
+                    )
+
+                # CLASSIFY UPLOADED QUERIES
+                st.subheader("Search Intent Classification")
+
+                X_queries = vectorizer.transform(queries)
+
+                predictions = model.predict(X_queries)
+
+                probabilities = model.predict_proba(X_queries)
+
+                confidence_scores = probabilities.max(axis=1) * 100
+
+                intent_df = pd.DataFrame({
+                    "Search Query": queries.values,
+                    "Predicted Intent": predictions,
+                    "Confidence (%)": confidence_scores.round(2)
+                })
+
+                st.dataframe(
+                    intent_df,
+                    use_container_width=True,
+                    hide_index=True
                 )
 
-                c.metric(
-                    "Transactional",
-                    int(intent_counts.get("Transactional", 0))
-                )
+                # INTENT DISTRIBUTION
+                st.subheader("📈 Predicted Search Intent Distribution")
 
-                d.metric(
-                    "Commercial",
-                    int(intent_counts.get("Commercial", 0))
-                )
+                intent_counts = intent_df[
+                    "Predicted Intent"
+                ].value_counts()
 
-                # INTENT CHART
                 fig, ax = plt.subplots(figsize=(9, 5))
 
                 intent_counts.plot(
@@ -352,9 +403,9 @@ if uploaded_file is not None:
                     ax=ax
                 )
 
-                ax.set_title("Search Intent Distribution")
                 ax.set_xlabel("Search Intent")
                 ax.set_ylabel("Number of Queries")
+                ax.set_title("Machine Learning Intent Predictions")
 
                 plt.xticks(rotation=20)
                 plt.tight_layout()
@@ -362,40 +413,22 @@ if uploaded_file is not None:
                 st.pyplot(fig)
                 plt.close(fig)
 
-                # INTENT TABLE
-                st.subheader("Search Query Classification")
-
-                st.dataframe(
-                    df[[text_column, "Search Intent"]],
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                # DOWNLOAD
+                # DOWNLOAD KEYWORDS
                 st.divider()
-
-                st.subheader("⬇️ Download Analysis Results")
-
-                download_data = results.to_csv(
-                    index=False
-                ).encode("utf-8")
+                st.subheader("⬇️ Download Results")
 
                 st.download_button(
                     "Download Keyword Results",
-                    data=download_data,
-                    file_name="keyword_results.csv",
-                    mime="text/csv"
+                    results.to_csv(index=False).encode("utf-8"),
+                    "keyword_results.csv",
+                    "text/csv"
                 )
 
-                intent_download = df[
-                    [text_column, "Search Intent"]
-                ].to_csv(index=False).encode("utf-8")
-
                 st.download_button(
-                    "Download Search Intent Results",
-                    data=intent_download,
-                    file_name="search_intent_results.csv",
-                    mime="text/csv"
+                    "Download ML Intent Predictions",
+                    intent_df.to_csv(index=False).encode("utf-8"),
+                    "ml_intent_predictions.csv",
+                    "text/csv"
                 )
 
     except Exception as e:
@@ -420,8 +453,7 @@ else:
     st.dataframe(sample, use_container_width=True)
 
 
-# FOOTER
 st.caption(
     "Search Engine Keyword Frequency Analysis | "
-    "Python and Streamlit"
+    "Python, Streamlit and Machine Learning"
 )
