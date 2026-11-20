@@ -2,4 +2,4 @@ streamlit
 pandas
 matplotlib
 WordCloud
-scikit learn 
+scikit-learn 
